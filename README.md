@@ -45,7 +45,7 @@ Follow these steps to set up the project locally.
 
 ### 1. Clone the Repository
 ```bash
-git clone [https://github.com/username/Assyafiiyah_store.git](https://github.com/username/Assyafiiyah_store.git)
+git clone https://github.com/hulkganteng/assyafiiyah_store.git
 cd Assyafiiyah_store
 
 **Instalasi**
