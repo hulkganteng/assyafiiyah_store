@@ -173,6 +173,9 @@
                                             <img src="{{ $details['image'] ? asset('storage/' . $details['image']) : 'https://via.placeholder.com/60' }}" class="w-14 h-14 object-cover rounded-md border border-gray-200">
                                             <div class="flex-1">
                                                 <h4 class="font-bold text-gray-800 text-sm line-clamp-2">{{ $details['name'] }}</h4>
+                                                @if(!empty($details['variant_label']))
+                                                    <div class="text-xs text-gray-500 mt-1">{{ $details['variant_label'] }}</div>
+                                                @endif
                                                 <div class="flex justify-between mt-1 text-sm">
                                                     <span class="text-gray-500">{{ $details['quantity'] }}x</span>
                                                     <div class="text-right">

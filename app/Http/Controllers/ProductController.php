@@ -9,7 +9,10 @@ class ProductController extends Controller
 {
     public function show($slug)
     {
-        $product = Product::active()->where('slug', $slug)->firstOrFail();
+        $product = Product::active()
+            ->with('variants')
+            ->where('slug', $slug)
+            ->firstOrFail();
         return view('products.show', compact('product'));
     }
 }

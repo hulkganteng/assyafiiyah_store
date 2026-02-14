@@ -6,6 +6,8 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\BankAccount;
 use App\Models\Product;
+use App\Models\ProductVariant;
+use App\Services\GoogleSheetsWebhook;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -20,12 +22,30 @@ class CheckoutController extends Controller
         foreach ($cart as $id => $item) {
             $product = Product::find($item['id']);
             if (!$product) {
+                unset($cart[$id]);
+                $hasUpdates = true;
                 continue;
             }
-            $cart[$id]['price'] = $product->discounted_price;
-            $cart[$id]['original_price'] = $product->price;
+            $variant = null;
+            if (!empty($item['variant_id'])) {
+                $variant = ProductVariant::where('product_id', $product->id)
+                    ->where('id', $item['variant_id'])
+                    ->first();
+                if (!$variant) {
+                    unset($cart[$id]);
+                    $hasUpdates = true;
+                    continue;
+                }
+            }
+
+            $basePrice = $variant ? (float) $variant->price : (float) $product->price;
+            $cart[$id]['price'] = $product->has_active_discount
+                ? $product->discountPrice($basePrice)
+                : $basePrice;
+            $cart[$id]['original_price'] = $basePrice;
             $cart[$id]['has_discount'] = $product->has_active_discount;
             $cart[$id]['discount_label'] = $product->discount_label;
+            $cart[$id]['variant_label'] = $variant ? $variant->label : null;
             $hasUpdates = true;
         }
         if ($hasUpdates) {
@@ -80,10 +100,26 @@ class CheckoutController extends Controller
         $totalItemPrice = 0;
         foreach($cart as $id => $details) {
             $product = Product::find($details['id']);
-            if (!$product || $details['quantity'] > $product->stock) {
+            if (!$product) {
+                return redirect()->route('cart.index')->with('error', 'Produk tidak ditemukan.');
+            }
+
+            $variant = null;
+            if (!empty($details['variant_id'])) {
+                $variant = ProductVariant::where('product_id', $product->id)
+                    ->where('id', $details['variant_id'])
+                    ->first();
+                if (!$variant) {
+                    return redirect()->route('cart.index')->with('error', 'Varian tidak ditemukan.');
+                }
+            }
+
+            $stock = $variant ? $variant->stock : $product->stock;
+            if ($details['quantity'] > $stock) {
                 return redirect()->route('cart.index')->with('error', 'Stok tidak mencukupi untuk salah satu produk.');
             }
-            $unitPrice = $product->discounted_price;
+            $basePrice = $variant ? (float) $variant->price : (float) $product->price;
+            $unitPrice = $product->has_active_discount ? $product->discountPrice($basePrice) : $basePrice;
             $totalItemPrice += $unitPrice * $details['quantity'];
         }
 
@@ -136,16 +172,34 @@ class CheckoutController extends Controller
                 if (!$product) {
                     continue;
                 }
-                $unitPrice = $product->discounted_price;
+                $variant = null;
+                if (!empty($details['variant_id'])) {
+                    $variant = ProductVariant::where('product_id', $product->id)
+                        ->where('id', $details['variant_id'])
+                        ->first();
+                    if (!$variant) {
+                        continue;
+                    }
+                }
+                $basePrice = $variant ? (float) $variant->price : (float) $product->price;
+                $unitPrice = $product->has_active_discount ? $product->discountPrice($basePrice) : $basePrice;
                 OrderItem::create([
                     'order_id' => $order->id,
                     'product_id' => $details['id'],
+                    'product_variant_id' => $variant?->id,
+                    'variant_label' => $variant ? $variant->label : null,
                     'quantity' => $details['quantity'],
                     'price' => $unitPrice,
                     'subtotal' => $unitPrice * $details['quantity'],
                 ]);
 
-                Product::where('id', $details['id'])->decrement('stock', $details['quantity']);
+                if ($variant) {
+                    ProductVariant::where('id', $variant->id)->decrement('stock', $details['quantity']);
+                    $freshStock = ProductVariant::where('product_id', $product->id)->sum('stock');
+                    Product::where('id', $product->id)->update(['stock' => $freshStock]);
+                } else {
+                    Product::where('id', $details['id'])->decrement('stock', $details['quantity']);
+                }
             }
 
             // Removed COD Logic block
@@ -181,7 +235,10 @@ class CheckoutController extends Controller
                 }
             }
 
-            return redirect()->route('orders.show', $order)->with('success', 'Pesanan berhasil dibuat!');
+            app(GoogleSheetsWebhook::class)->sendOrderSnapshot($order, 'order_created');
+
+            return redirect()->to(route('orders.show', $order).'#payment-section')
+                ->with('success', 'Pesanan berhasil dibuat!');
 
         } catch (\Exception $e) {
             DB::rollBack();

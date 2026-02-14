@@ -3,22 +3,25 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>Struk Pengiriman - {{ $order->order_code }}</title>
+        <title>Struk Pembayaran - {{ $order->order_code }}</title>
         <style>
             :root { color-scheme: light; }
             * { box-sizing: border-box; }
-            @page { size: 5.8cm auto; margin: 0.2cm; }
+            @page { size: 5.8cm auto; margin: 0; }
             body {
                 margin: 0;
                 font-family: "Segoe UI", Arial, sans-serif;
                 font-size: 10px;
+                line-height: 1.35;
                 color: #111827;
-                width: 5.8cm;
+                width: 5.6cm;
                 background: #ffffff;
             }
             .receipt {
-                width: 5.8cm;
-                padding: 4px;
+                width: 5.6cm;
+                padding: 6px 5px;
+                overflow-wrap: anywhere;
+                word-break: break-word;
             }
             h1 {
                 font-size: 12px;
@@ -28,7 +31,9 @@
                 text-align: center;
             }
             .line { border-top: 1px dashed #9ca3af; margin: 6px 0; }
-            .row { display: flex; justify-content: space-between; gap: 6px; }
+            .row { display: flex; justify-content: space-between; gap: 6px; align-items: flex-start; }
+            .row > div { flex: 1 1 50%; min-width: 0; }
+            .row > div:last-child { text-align: right; overflow-wrap: anywhere; word-break: break-word; }
             .label { color: #6b7280; }
             .items { margin-top: 6px; }
             .items table { width: 100%; border-collapse: collapse; }
@@ -39,19 +44,53 @@
                 color: #6b7280;
                 border-bottom: 1px solid #e5e7eb;
             }
+            .items td { vertical-align: top; white-space: normal; word-break: break-word; overflow-wrap: anywhere; }
+            .items td:first-child { width: 60%; }
             .items td:last-child { text-align: right; }
             .total { margin-top: 6px; font-weight: 700; }
-            @media print {
-            }
         </style>
     </head>
     <body>
         @php
             $subtotal = $order->items->sum('subtotal');
             $shippingCost = $order->shipping_cost ?? 0;
+            $paymentStatus = $order->payment ? $order->payment->verified_status : 'pending';
+            $paymentStatusLabel = match ($paymentStatus) {
+                'approved' => 'Disetujui',
+                'rejected' => 'Ditolak',
+                default => 'Menunggu',
+            };
+            $orderStatusLabel = match ($order->status) {
+                'pending_payment' => 'Menunggu Bayar',
+                'paid' => 'Paid',
+                'processing' => 'Diproses',
+                'shipped' => 'Dikirim',
+                'completed' => 'Selesai',
+                'cancelled' => 'Dibatalkan',
+                default => ucfirst(str_replace('_', ' ', (string) $order->status)),
+            };
+            $addressLines = [];
+            if ($order->shipping_address_detail) {
+                $addressLines[] = $order->shipping_address_detail;
+            }
+            $regionParts = array_filter([
+                $order->shipping_village,
+                $order->shipping_district,
+                $order->shipping_city,
+                $order->shipping_province,
+            ]);
+            if (!empty($regionParts)) {
+                $addressLines[] = implode(', ', $regionParts);
+            }
+            if ($order->shipping_postal_code) {
+                $addressLines[] = 'Kode Pos ' . $order->shipping_postal_code;
+            }
+            if (empty($addressLines) && $order->shipping_address) {
+                $addressLines[] = $order->shipping_address;
+            }
         @endphp
         <div class="receipt">
-            <h1>Struk Pengiriman</h1>
+            <h1>Struk Pembayaran</h1>
             <div class="row">
                 <div class="label">Order</div>
                 <div>{{ $order->order_code }}</div>
@@ -60,43 +99,36 @@
                 <div class="label">Tanggal</div>
                 <div>{{ $order->created_at->format('d/m/Y H:i') }}</div>
             </div>
+            <div class="row">
+                <div class="label">Metode</div>
+                <div>{{ $order->payment_method == 'cod' ? 'COD' : 'Transfer' }}</div>
+            </div>
+            <div class="row">
+                <div class="label">Status</div>
+                <div>{{ $orderStatusLabel }}</div>
+            </div>
+            <div class="row">
+                <div class="label">Status Bayar</div>
+                <div>{{ $paymentStatusLabel }}</div>
+            </div>
             <div class="line"></div>
             <div>
                 <div class="label">Penerima</div>
                 <div>{{ $order->customer_name ?? $order->user->name ?? 'Tamu' }}</div>
                 <div>{{ $order->shipping_phone }}</div>
             </div>
-            <div class="line"></div>
-            <div>
-                <div class="label">Alamat</div>
-                @php
-                    $addressLines = [];
-                    if ($order->shipping_address_detail) {
-                        $addressLines[] = $order->shipping_address_detail;
-                    }
-                    $regionParts = array_filter([
-                        $order->shipping_village,
-                        $order->shipping_district,
-                        $order->shipping_city,
-                        $order->shipping_province,
-                    ]);
-                    if (!empty($regionParts)) {
-                        $addressLines[] = implode(', ', $regionParts);
-                    }
-                    if ($order->shipping_postal_code) {
-                        $addressLines[] = 'Kode Pos ' . $order->shipping_postal_code;
-                    }
-                    if (empty($addressLines) && $order->shipping_address) {
-                        $addressLines[] = $order->shipping_address;
-                    }
-                @endphp
-                @foreach($addressLines as $line)
-                    <div>{{ $line }}</div>
-                @endforeach
-            </div>
+            @if(!empty($addressLines))
+                <div class="line"></div>
+                <div>
+                    <div class="label">Alamat</div>
+                    @foreach($addressLines as $line)
+                        <div>{{ $line }}</div>
+                    @endforeach
+                </div>
+            @endif
             <div class="line"></div>
             <div class="row">
-                <div class="label">Metode</div>
+                <div class="label">Metode Kirim</div>
                 <div>{{ $order->shipping_method == 'pickup' ? 'Ambil Sendiri' : 'Kurir Ekspedisi' }}</div>
             </div>
             <div class="items">
@@ -133,6 +165,12 @@
                 <div class="label">Ongkir</div>
                 <div>Rp {{ number_format($shippingCost, 0, ',', '.') }}</div>
             </div>
+            @if($order->has_discount)
+                <div class="row">
+                    <div class="label">{{ $order->discount_label }}</div>
+                    <div>- Rp {{ number_format($order->discount_amount, 0, ',', '.') }}</div>
+                </div>
+            @endif
             <div class="row total">
                 <div>Total</div>
                 <div>Rp {{ number_format($order->total_price, 0, ',', '.') }}</div>

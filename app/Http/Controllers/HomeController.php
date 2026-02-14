@@ -11,7 +11,11 @@ class HomeController extends Controller
     public function index(Request $request)
     {
         $categories = Category::all();
-        $query = Product::active()->with('category');
+        $query = Product::active()
+            ->with('category')
+            ->withCount('variants')
+            ->withMin('variants', 'price')
+            ->withSum('variants', 'stock');
 
         if ($request->filled('category')) {
             $query->whereHas('category', function($q) use ($request) {

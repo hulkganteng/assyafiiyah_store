@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class PaymentController extends Controller
 {
@@ -21,6 +22,9 @@ class PaymentController extends Controller
         }
 
         if (str_starts_with($digits, '62')) {
+            if (strlen($digits) > 2 && $digits[2] === '0') {
+                return '62'.substr($digits, 3);
+            }
             return $digits;
         }
 
@@ -33,6 +37,37 @@ class PaymentController extends Controller
         }
 
         return $digits;
+    }
+
+    private function sendFonnteMessage(?string $target, string $message): void
+    {
+        $fonnteToken = trim((string) config('services.fonnte.token'));
+        $normalized = $this->normalizePhone($target);
+        if (!$normalized || $fonnteToken === '') {
+            return;
+        }
+
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => $fonnteToken,
+            ])->asForm()->post('https://api.fonnte.com/send', [
+                'target' => $normalized,
+                'message' => $message,
+            ]);
+
+            if (!$response->ok()) {
+                Log::warning('Fonnte send failed.', [
+                    'target' => $normalized,
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Fonnte send error.', [
+                'target' => $normalized,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     public function index()
@@ -68,45 +103,19 @@ class PaymentController extends Controller
 
             // Send WhatsApp feedback to customer after approval
             if ($previousStatus !== 'approved') {
-                $customerNumber = $this->normalizePhone($order->shipping_phone);
-                $fonnteToken = config('services.fonnte.token');
-                if ($customerNumber && $fonnteToken) {
-                    try {
-                        $message = "Pembayaran kamu sudah disetujui.\n".
-                            "Order: {$order->order_code}\n".
-                            "Status: {$order->status}\n".
-                            "Terima kasih, pesanan akan segera diproses.";
-                        Http::withHeaders([
-                            'Authorization' => $fonnteToken,
-                        ])->asForm()->post('https://api.fonnte.com/send', [
-                            'target' => $customerNumber,
-                            'message' => $message,
-                        ]);
-                    } catch (\Throwable $e) {
-                        // Silently ignore notification errors to avoid blocking admin flow.
-                    }
-                }
+                $message = "Pembayaran kamu sudah disetujui.\n".
+                    "Order: {$order->order_code}\n".
+                    "Status: {$order->status}\n".
+                    "Terima kasih, pesanan akan segera diproses.";
+                $this->sendFonnteMessage($order->shipping_phone, $message);
             }
         } elseif ($request->status == 'rejected') {
             $order = $payment->order;
             if ($order && $previousStatus !== 'rejected') {
-                $customerNumber = $this->normalizePhone($order->shipping_phone);
-                $fonnteToken = config('services.fonnte.token');
-                if ($customerNumber && $fonnteToken) {
-                    try {
-                        $message = "Pembayaran kamu ditolak.\n".
-                            "Order: {$order->order_code}\n".
-                            "Silakan cek kembali bukti pembayaran atau hubungi admin.";
-                        Http::withHeaders([
-                            'Authorization' => $fonnteToken,
-                        ])->asForm()->post('https://api.fonnte.com/send', [
-                            'target' => $customerNumber,
-                            'message' => $message,
-                        ]);
-                    } catch (\Throwable $e) {
-                        // Silently ignore notification errors to avoid blocking admin flow.
-                    }
-                }
+                $message = "Pembayaran kamu ditolak.\n".
+                    "Order: {$order->order_code}\n".
+                    "Silakan cek kembali bukti pembayaran atau hubungi admin.";
+                $this->sendFonnteMessage($order->shipping_phone, $message);
             }
         }
 

@@ -53,6 +53,44 @@
                             <textarea name="description" id="description" rows="4" class="w-full rounded-xl border-gray-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 bg-gray-50" placeholder="Jelaskan detail produk..."></textarea>
                         </div>
 
+                        <div class="pt-4 border-t border-gray-100">
+                            <div class="flex items-center justify-between mb-4">
+                                <div>
+                                    <h4 class="text-lg font-serif font-bold text-gray-800">Varian Produk (Opsional)</h4>
+                                    <p class="text-sm text-gray-500">Contoh: Warna (Merah, Biru) dan Ukuran (S, M, L).</p>
+                                </div>
+                                <button type="button" id="add-variant-row" class="px-4 py-2 bg-emerald-600 text-white text-sm font-bold rounded-lg shadow hover:bg-emerald-700 transition">
+                                    + Tambah Varian
+                                </button>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-700 mb-2">Nama Varian 1</label>
+                                    <input type="text" name="option1_name" class="w-full rounded-xl border-gray-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 bg-gray-50" placeholder="Contoh: Warna">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-700 mb-2">Nama Varian 2 (Opsional)</label>
+                                    <input type="text" name="option2_name" class="w-full rounded-xl border-gray-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 bg-gray-50" placeholder="Contoh: Ukuran">
+                                </div>
+                            </div>
+
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr class="text-xs uppercase tracking-wider text-gray-500 border-b">
+                                            <th class="py-2 pr-4">Varian 1</th>
+                                            <th class="py-2 pr-4">Varian 2</th>
+                                            <th class="py-2 pr-4">Harga</th>
+                                            <th class="py-2 pr-4">Stok</th>
+                                            <th class="py-2 text-right">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="variant-rows"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
                         <div>
                             <label for="image" class="block text-sm font-bold text-gray-700 mb-2">Gambar Produk</label>
                             <input type="file" name="image" id="image" class="block w-full text-sm text-gray-500
@@ -93,4 +131,36 @@
             </div>
         </div>
     </div>
+    <script>
+        const variantRows = document.getElementById('variant-rows');
+        const addVariantRowBtn = document.getElementById('add-variant-row');
+        let variantIndex = 0;
+
+        function addVariantRow(values = {}) {
+            const row = document.createElement('tr');
+            row.className = 'border-b border-gray-100';
+            row.innerHTML = `
+                <td class="py-3 pr-4">
+                    <input type="text" name="variant_value_1[]" value="${values.value1 || ''}" class="w-full rounded-lg border-gray-200 bg-gray-50 text-sm" placeholder="Contoh: Merah">
+                </td>
+                <td class="py-3 pr-4">
+                    <input type="text" name="variant_value_2[]" value="${values.value2 || ''}" class="w-full rounded-lg border-gray-200 bg-gray-50 text-sm" placeholder="Contoh: L">
+                </td>
+                <td class="py-3 pr-4">
+                    <input type="number" name="variant_price[]" value="${values.price || ''}" class="w-full rounded-lg border-gray-200 bg-gray-50 text-sm" placeholder="0">
+                </td>
+                <td class="py-3 pr-4">
+                    <input type="number" name="variant_stock[]" value="${values.stock || ''}" class="w-full rounded-lg border-gray-200 bg-gray-50 text-sm" placeholder="0">
+                </td>
+                <td class="py-3 text-right">
+                    <button type="button" class="text-rose-500 hover:text-rose-700 text-sm font-bold remove-variant">Hapus</button>
+                </td>
+            `;
+            row.querySelector('.remove-variant').addEventListener('click', () => row.remove());
+            variantRows.appendChild(row);
+            variantIndex += 1;
+        }
+
+        addVariantRowBtn.addEventListener('click', () => addVariantRow());
+    </script>
 </x-app-layout>

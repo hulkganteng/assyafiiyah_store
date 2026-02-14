@@ -142,7 +142,12 @@
                 <tbody>
                     @foreach($order->items as $item)
                         <tr>
-                            <td>{{ $item->product->name }}</td>
+                            <td>
+                                <div>{{ $item->product->name }}</div>
+                                @if($item->variant_label)
+                                    <div class="text-xs text-gray-600">{{ $item->variant_label }}</div>
+                                @endif
+                            </td>
                             <td>{{ $item->quantity }}</td>
                             <td>Rp {{ number_format($item->subtotal, 0, ',', '.') }}</td>
                         </tr>

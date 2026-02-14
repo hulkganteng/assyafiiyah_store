@@ -41,4 +41,8 @@ return [
         'bot_number' => env('FONNTE_BOT_NUMBER'),
     ],
 
+    'google_sheets' => [
+        'webhook_url' => env('GOOGLE_SHEETS_WEBHOOK_URL'),
+    ],
+
 ];

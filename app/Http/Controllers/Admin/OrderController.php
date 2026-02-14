@@ -5,11 +5,75 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\ProductVariant;
+use App\Services\GoogleSheetsWebhook;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Barryvdh\DomPDF\Facade\Pdf;
 
 class OrderController extends Controller
 {
+    private function normalizePhone(?string $phone): ?string
+    {
+        if (!$phone) {
+            return null;
+        }
+
+        $digits = preg_replace('/\D+/', '', $phone);
+        if (!$digits) {
+            return null;
+        }
+
+        if (str_starts_with($digits, '62')) {
+            if (strlen($digits) > 2 && $digits[2] === '0') {
+                return '62'.substr($digits, 3);
+            }
+            return $digits;
+        }
+
+        if (str_starts_with($digits, '0')) {
+            return '62'.substr($digits, 1);
+        }
+
+        if (str_starts_with($digits, '8')) {
+            return '62'.$digits;
+        }
+
+        return $digits;
+    }
+
+    private function sendFonnteMessage(?string $target, string $message): void
+    {
+        $fonnteToken = trim((string) config('services.fonnte.token'));
+        $normalized = $this->normalizePhone($target);
+        if (!$normalized || $fonnteToken === '') {
+            return;
+        }
+
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => $fonnteToken,
+            ])->asForm()->post('https://api.fonnte.com/send', [
+                'target' => $normalized,
+                'message' => $message,
+            ]);
+
+            if (!$response->ok()) {
+                Log::warning('Fonnte send failed.', [
+                    'target' => $normalized,
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Fonnte send error.', [
+                'target' => $normalized,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
     public function index()
     {
         $orders = Order::with('user')->latest()->paginate(20);
@@ -23,14 +87,15 @@ class OrderController extends Controller
 
     public function shippingReceipt(Order $order)
     {
-        $pdf = Pdf::loadView('admin.orders.shipping-receipt', compact('order'))
+        $pdf = Pdf::loadView('admin.orders.payment-receipt', compact('order'))
             ->setPaper([0, 0, 165, 1000]);
-        return $pdf->stream('struk-pengiriman-'.$order->order_code.'.pdf');
+        return $pdf->stream('struk-pembayaran-'.$order->order_code.'.pdf');
     }
 
     public function paymentReceipt(Order $order)
     {
-        $pdf = Pdf::loadView('orders.payment-receipt', compact('order'));
+        $pdf = Pdf::loadView('admin.orders.payment-receipt', compact('order'))
+            ->setPaper([0, 0, 165, 1000]);
         return $pdf->stream('struk-pembayaran-'.$order->order_code.'.pdf');
     }
 
@@ -40,15 +105,41 @@ class OrderController extends Controller
 
         $oldStatus = $order->status;
         $newStatus = $request->status;
+        $previousPaymentStatus = $order->payment ? $order->payment->verified_status : null;
 
         // Restore stock if cancelled (stock is deducted on checkout)
         if ($newStatus == 'cancelled' && $oldStatus !== 'cancelled') {
             foreach ($order->items as $item) {
-                Product::where('id', $item->product_id)->increment('stock', $item->quantity);
+                if ($item->product_variant_id) {
+                    ProductVariant::where('id', $item->product_variant_id)->increment('stock', $item->quantity);
+                    $freshStock = ProductVariant::where('product_id', $item->product_id)->sum('stock');
+                    Product::where('id', $item->product_id)->update(['stock' => $freshStock]);
+                } else {
+                    Product::where('id', $item->product_id)->increment('stock', $item->quantity);
+                }
             }
         }
 
         $order->update(['status' => $request->status]);
+
+        if ($newStatus === 'paid' && $order->payment && $order->payment->verified_status !== 'approved') {
+            $order->payment->update([
+                'verified_status' => 'approved',
+                'verified_by' => auth()->id(),
+                'verified_at' => now(),
+            ]);
+            if ($previousPaymentStatus !== 'approved') {
+                $message = "Pembayaran kamu sudah disetujui.\n".
+                    "Order: {$order->order_code}\n".
+                    "Status: {$order->status}\n".
+                    "Terima kasih, pesanan akan segera diproses.";
+                $this->sendFonnteMessage($order->shipping_phone, $message);
+            }
+        }
+
+        if ($oldStatus !== $newStatus) {
+            app(GoogleSheetsWebhook::class)->sendOrderSnapshot($order, 'order_status_updated');
+        }
 
         return redirect()->back()->with('success', 'Status order diperbarui');
     }

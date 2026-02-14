@@ -41,6 +41,11 @@ class Product extends Model
         return $this->hasMany(ProductImage::class);
     }
 
+    public function variants()
+    {
+        return $this->hasMany(ProductVariant::class);
+    }
+
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
@@ -58,14 +63,7 @@ class Product extends Model
             return $price;
         }
 
-        $value = (float) $this->discount_value;
-        if ($this->discount_type === 'percent') {
-            $price -= ($price * ($value / 100));
-        } elseif ($this->discount_type === 'fixed') {
-            $price -= $value;
-        }
-
-        return max(0, round($price, 2));
+        return $this->discountPrice($price);
     }
 
     public function getDiscountLabelAttribute()
@@ -80,5 +78,19 @@ class Product extends Model
         }
 
         return 'Potongan Rp ' . number_format((float) $this->discount_value, 0, ',', '.');
+    }
+
+    public function discountPrice(float $basePrice): float
+    {
+        $price = $basePrice;
+        $value = (float) $this->discount_value;
+
+        if ($this->discount_type === 'percent') {
+            $price -= ($price * ($value / 100));
+        } elseif ($this->discount_type === 'fixed') {
+            $price -= $value;
+        }
+
+        return max(0, round($price, 2));
     }
 }

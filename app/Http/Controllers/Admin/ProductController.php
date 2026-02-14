@@ -29,7 +29,7 @@ class ProductController extends Controller
             'category_id' => 'required',
             'price' => 'required|numeric',
             'stock' => 'required|integer',
-            'image' => 'nullable|image|max:2048'
+            'image' => 'nullable|image|max:2048',
         ]);
 
         $product = Product::create([
@@ -42,6 +42,8 @@ class ProductController extends Controller
             'is_active' => $request->has('is_active') ? true : false,
             'is_preorder' => $request->input('is_preorder', 0),
         ]);
+
+        $this->syncVariants($product, $request);
 
         if ($request->hasFile('image')) {
             $path = $request->file('image')->store('products', 'public');
@@ -76,6 +78,8 @@ class ProductController extends Controller
             'is_active' => $request->has('is_active') ? true : false,
             'is_preorder' => $request->input('is_preorder', 0),
         ]);
+
+        $this->syncVariants($product, $request);
 
         if ($request->hasFile('image')) {
             $path = $request->file('image')->store('products', 'public');
@@ -128,5 +132,70 @@ class ProductController extends Controller
         ]);
 
         return redirect()->route('admin.products.index')->with('success', 'Potongan harga berhasil diterapkan ke produk terpilih.');
+    }
+
+    private function syncVariants(Product $product, Request $request): void
+    {
+        $existingIds = $product->variants()->pluck('id')->all();
+        $option1Name = trim((string) $request->input('option1_name'));
+        $option2Name = trim((string) $request->input('option2_name'));
+
+        $values1 = $request->input('variant_value_1', []);
+        $values2 = $request->input('variant_value_2', []);
+        $prices = $request->input('variant_price', []);
+        $stocks = $request->input('variant_stock', []);
+        $ids = $request->input('variant_id', []);
+
+        $keptIds = [];
+        $variantPrices = [];
+        $variantStocks = [];
+
+        foreach ($values1 as $index => $value1) {
+            $value1 = trim((string) $value1);
+            $value2 = isset($values2[$index]) ? trim((string) $values2[$index]) : null;
+            $price = $prices[$index] ?? null;
+            $stock = $stocks[$index] ?? null;
+
+            if ($value1 === '' || $price === null || $stock === null) {
+                continue;
+            }
+
+            $data = [
+                'option1_name' => $option1Name !== '' ? $option1Name : 'Varian 1',
+                'option1_value' => $value1,
+                'option2_name' => $value2 ? ($option2Name !== '' ? $option2Name : 'Varian 2') : null,
+                'option2_value' => $value2 ?: null,
+                'price' => $price,
+                'stock' => (int) $stock,
+            ];
+
+            $variantId = $ids[$index] ?? null;
+            if ($variantId) {
+                $variant = $product->variants()->where('id', $variantId)->first();
+                if ($variant) {
+                    $variant->update($data);
+                    $keptIds[] = $variant->id;
+                    $variantPrices[] = (float) $variant->price;
+                    $variantStocks[] = (int) $variant->stock;
+                    continue;
+                }
+            }
+
+            $variant = $product->variants()->create($data);
+            $keptIds[] = $variant->id;
+            $variantPrices[] = (float) $variant->price;
+            $variantStocks[] = (int) $variant->stock;
+        }
+
+        if (!empty($existingIds)) {
+            $product->variants()->whereNotIn('id', $keptIds)->delete();
+        }
+
+        if (count($variantPrices) > 0) {
+            $product->update([
+                'price' => min($variantPrices),
+                'stock' => array_sum($variantStocks),
+            ]);
+        }
     }
 }

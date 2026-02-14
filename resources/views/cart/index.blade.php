@@ -33,7 +33,7 @@
                             </thead>
                             <tbody class="divide-y divide-gray-100">
                                 @php $total = 0; @endphp
-                                @foreach($cart as $id => $details)
+                                @foreach($cart as $cartKey => $details)
                                     @php $total += $details['price'] * $details['quantity']; @endphp
                                     <tr class="hover:bg-gray-50 transition-colors">
                                         <td class="p-4">
@@ -41,7 +41,12 @@
                                                 <div class="w-20 h-20 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
                                                     <img src="{{ $details['image'] ? asset('storage/' . $details['image']) : 'https://via.placeholder.com/100' }}" class="w-full h-full object-cover">
                                                 </div>
-                                                <div class="font-medium text-gray-900">{{ $details['name'] }}</div>
+                                                <div class="font-medium text-gray-900">
+                                                    {{ $details['name'] }}
+                                                    @if(!empty($details['variant_label']))
+                                                        <div class="text-xs text-gray-500 mt-1">{{ $details['variant_label'] }}</div>
+                                                    @endif
+                                                </div>
                                             </div>
                                         </td>
                                         <td class="p-4 whitespace-nowrap text-gray-600">
@@ -60,7 +65,7 @@
                                         <td class="p-4">
                                             <form action="{{ route('cart.update') }}" method="POST" class="flex items-center justify-center gap-2">
                                                 @csrf
-                                                <input type="hidden" name="id" value="{{ $id }}">
+                                                <input type="hidden" name="cart_key" value="{{ $cartKey }}">
                                                 <input type="number" name="quantity" value="{{ $details['quantity'] }}" min="1" class="w-16 text-center rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500 bg-gray-50">
                                                 <button type="submit" class="p-2 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-full transition" title="Update Jumlah">
                                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -73,7 +78,7 @@
                                         <td class="p-4 text-center">
                                             <form action="{{ route('cart.remove') }}" method="POST">
                                                 @csrf
-                                                <input type="hidden" name="id" value="{{ $id }}">
+                                                <input type="hidden" name="cart_key" value="{{ $cartKey }}">
                                                 <button type="submit" class="text-red-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-full transition" title="Hapus Produk">
                                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />

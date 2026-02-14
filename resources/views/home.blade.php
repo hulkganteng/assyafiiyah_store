@@ -63,14 +63,20 @@
              @if($products->count() > 0)
                 <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
                     @foreach($products as $product)
+                        @php
+                            $hasVariants = ($product->variants_count ?? 0) > 0;
+                            $variantMinPrice = $hasVariants ? (float) ($product->variants_min_price ?? $product->price) : (float) $product->price;
+                            $variantStock = $hasVariants ? (int) ($product->variants_sum_stock ?? 0) : (int) $product->stock;
+                            $displayPrice = $product->has_active_discount ? $product->discountPrice($variantMinPrice) : $variantMinPrice;
+                        @endphp
                         <div class="group bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 overflow-hidden flex flex-col h-full relative">
                             <!-- Badge Stock -->
                             <!-- Badge Stock -->
                              @if($product->is_preorder)
                                 <span class="absolute top-3 left-3 bg-blue-600 text-white text-[10px] font-bold px-2 py-1 rounded-sm shadow z-10">Pre Order</span>
-                             @elseif($product->stock < 5 && $product->stock > 0)
-                                <span class="absolute top-3 left-3 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded-sm shadow z-10">Tersisa {{ $product->stock }}</span>
-                            @elseif($product->stock == 0)
+                             @elseif($variantStock < 5 && $variantStock > 0)
+                                <span class="absolute top-3 left-3 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded-sm shadow z-10">Tersisa {{ $variantStock }}</span>
+                            @elseif($variantStock == 0)
                                 <span class="absolute top-3 left-3 bg-gray-600 text-white text-[10px] font-bold px-2 py-1 rounded-sm shadow z-10">Habis</span>
                             @endif
                             @if($product->has_active_discount)
@@ -82,14 +88,20 @@
                                 <img src="{{ $product->images->first() ? asset('storage/' . $product->images->first()->path) : 'https://via.placeholder.com/300' }}" alt="{{ $product->name }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
                                 <!-- Quick Action Overlay -->
                                 <div class="absolute inset-x-0 bottom-0 p-4 translate-y-full group-hover:translate-y-0 transition-transform duration-300 flex justify-center">
-                                    <form action="{{ route('cart.add') }}" method="POST" class="w-full">
-                                        @csrf
-                                        <input type="hidden" name="product_id" value="{{ $product->id }}">
-                                        <input type="hidden" name="quantity" value="1">
-                                        <button type="submit" class="w-full bg-white/90 backdrop-blur text-emerald-800 font-bold py-2 rounded-lg shadow-lg hover:bg-emerald-600 hover:text-white transition-colors" {{ ($product->stock < 1 && !$product->is_preorder) ? 'disabled' : '' }}>
-                                            + Keranjang
-                                        </button>
-                                    </form>
+                                    @if($hasVariants)
+                                        <a href="{{ route('products.show', $product->slug) }}" class="w-full text-center bg-white/90 backdrop-blur text-emerald-800 font-bold py-2 rounded-lg shadow-lg hover:bg-emerald-600 hover:text-white transition-colors">
+                                            Pilih Varian
+                                        </a>
+                                    @else
+                                        <form action="{{ route('cart.add') }}" method="POST" class="w-full">
+                                            @csrf
+                                            <input type="hidden" name="product_id" value="{{ $product->id }}">
+                                            <input type="hidden" name="quantity" value="1">
+                                            <button type="submit" class="w-full bg-white/90 backdrop-blur text-emerald-800 font-bold py-2 rounded-lg shadow-lg hover:bg-emerald-600 hover:text-white transition-colors" {{ ($variantStock < 1 && !$product->is_preorder) ? 'disabled' : '' }}>
+                                                + Keranjang
+                                            </button>
+                                        </form>
+                                    @endif
                                 </div>
                             </div>
 
@@ -104,11 +116,11 @@
                                 <div class="mt-auto flex items-center justify-between border-t border-gray-50 pt-4">
                                      @if($product->has_active_discount)
                                         <div class="flex flex-col">
-                                            <span class="text-xs text-gray-400 line-through">Rp {{ number_format($product->price, 0, ',', '.') }}</span>
-                                            <span class="text-lg font-bold text-emerald-700">Rp {{ number_format($product->discounted_price, 0, ',', '.') }}</span>
+                                            <span class="text-xs text-gray-400 line-through">Rp {{ number_format($variantMinPrice, 0, ',', '.') }}</span>
+                                            <span class="text-lg font-bold text-emerald-700">Rp {{ number_format($displayPrice, 0, ',', '.') }}</span>
                                         </div>
                                      @else
-                                        <span class="text-lg font-bold text-emerald-700">Rp {{ number_format($product->price, 0, ',', '.') }}</span>
+                                        <span class="text-lg font-bold text-emerald-700">Rp {{ number_format($displayPrice, 0, ',', '.') }}</span>
                                      @endif
                                      <a href="{{ route('products.show', $product->slug) }}" class="text-gray-400 hover:text-emerald-600 transition">
                                          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">

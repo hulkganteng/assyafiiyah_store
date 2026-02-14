@@ -32,6 +32,8 @@ Route::get('/locations/cities/{provinceId}', [LocationController::class, 'cities
 Route::get('/locations/districts/{cityId}', [LocationController::class, 'districts'])->name('locations.districts');
 Route::get('/locations/villages/{districtId}', [LocationController::class, 'villages'])->name('locations.villages');
 
+Route::get('/orders/track', [OrderController::class, 'trackForm'])->name('orders.track');
+Route::post('/orders/track', [OrderController::class, 'track'])->name('orders.track.submit');
 Route::get('/orders/{order}', [OrderController::class, 'show'])->name('orders.show');
 Route::post('/orders/{order}/pay', [OrderController::class, 'storePayment'])->name('orders.pay');
 Route::get('/orders/{order}/payment-receipt', [OrderController::class, 'paymentReceipt'])->name('orders.payment-receipt');

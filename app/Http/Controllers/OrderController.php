@@ -22,6 +22,62 @@ class OrderController extends Controller
         return view('orders.show', compact('order', 'bankAccounts'));
     }
 
+    private function normalizePhone(?string $phone): ?string
+    {
+        if (!$phone) {
+            return null;
+        }
+
+        $digits = preg_replace('/\D+/', '', $phone);
+        if (!$digits) {
+            return null;
+        }
+
+        if (str_starts_with($digits, '62')) {
+            if (strlen($digits) > 2 && $digits[2] === '0') {
+                return '62'.substr($digits, 3);
+            }
+            return $digits;
+        }
+
+        if (str_starts_with($digits, '0')) {
+            return '62'.substr($digits, 1);
+        }
+
+        if (str_starts_with($digits, '8')) {
+            return '62'.$digits;
+        }
+
+        return $digits;
+    }
+
+    public function trackForm()
+    {
+        return view('orders.track');
+    }
+
+    public function track(Request $request)
+    {
+        $data = $request->validate([
+            'order_code' => 'required|string|max:50',
+            'shipping_phone' => 'required|string|max:30',
+        ]);
+
+        $code = strtoupper(trim($data['order_code']));
+        $order = Order::where('order_code', $code)->first();
+        if (!$order) {
+            return back()->with('error', 'Kode order tidak ditemukan.');
+        }
+
+        $inputPhone = $this->normalizePhone($data['shipping_phone']);
+        $orderPhone = $this->normalizePhone($order->shipping_phone);
+        if (!$inputPhone || !$orderPhone || $inputPhone !== $orderPhone) {
+            return back()->with('error', 'Nomor WhatsApp tidak sesuai dengan order.');
+        }
+
+        return redirect()->route('orders.show', $order);
+    }
+
     public function storePayment(Request $request, Order $order)
     {
         // Removed Auth check to allow guests to upload payment proof based on Order ID/URL

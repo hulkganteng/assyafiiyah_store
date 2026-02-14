@@ -73,6 +73,9 @@
                                     </div>
                                     <div class="flex-1 text-center md:text-left">
                                         <h4 class="text-lg font-bold text-emerald-900">{{ $item->product->name }}</h4>
+                                        @if($item->variant_label)
+                                            <p class="text-xs text-gray-500 mt-1">{{ $item->variant_label }}</p>
+                                        @endif
                                         <p class="text-gray-500">{{ $item->quantity }} x Rp {{ number_format($item->price, 0, ',', '.') }}</p>
                                     </div>
                                     <div class="text-right">
@@ -212,7 +215,7 @@
 
                     <!-- Payment Action Box -->
                     @if($order->status == 'pending_payment' && $order->payment_method == 'bank_transfer')
-                        <div class="bg-white overflow-hidden shadow-xl sm:rounded-3xl border-2 border-gold-400 relative">
+                        <div id="payment-section" class="bg-white overflow-hidden shadow-xl sm:rounded-3xl border-2 border-gold-400 relative">
                             <div class="absolute top-0 inset-x-0 h-1 bg-gold-400"></div>
                             <div class="p-6">
                                 <div class="text-center mb-6">
@@ -283,7 +286,7 @@
                         </div>
                     @else
                         <!-- Simple contact card for help -->
-                        <div class="bg-emerald-800 rounded-3xl p-6 text-white text-center shadow-lg">
+                        <div id="payment-section" class="bg-emerald-800 rounded-3xl p-6 text-white text-center shadow-lg">
                            <h4 class="font-bold text-lg mb-2">Butuh Bantuan?</h4>
                            <p class="text-emerald-200 text-sm mb-4">Jika ada masalah dengan pesanan Anda, hubungi kami via WhatsApp.</p>
                            <a href="#" class="inline-block px-6 py-2 bg-emerald-600 rounded-full font-bold hover:bg-emerald-500 transition">Hubungi Admin</a>

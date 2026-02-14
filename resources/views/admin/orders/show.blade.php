@@ -106,6 +106,9 @@
                                     </div>
                                     <div class="flex-1 text-center md:text-left">
                                         <h4 class="text-lg font-bold text-emerald-900">{{ $item->product->name }}</h4>
+                                        @if($item->variant_label)
+                                            <p class="text-xs text-gray-500 mt-1">{{ $item->variant_label }}</p>
+                                        @endif
                                         <p class="text-gray-500">{{ $item->quantity }} x Rp {{ number_format($item->price, 0, ',', '.') }}</p>
                                     </div>
                                     <div class="text-right">
@@ -183,25 +186,11 @@
                         </div>
                         <div class="p-6">
                             <a href="{{ route('admin.orders.payment-receipt', $order) }}" target="_blank" class="inline-flex items-center justify-center w-full px-4 py-3 rounded-xl bg-emerald-600 text-white font-bold shadow hover:bg-emerald-700 transition">
-                                Unduh PDF Struk Pembayaran
+                                Unduh PDF Struk 5.8 cm
                             </a>
+                            <p class="text-xs text-gray-500 mt-3">Struk pembayaran sudah mencakup data pengiriman.</p>
                         </div>
                     </div>
-
-                    @if($order->shipping_method !== 'pickup')
-                        <!-- Shipping Receipt -->
-                        <div class="bg-white overflow-hidden shadow-xl sm:rounded-3xl border border-gray-100">
-                            <div class="p-6 border-b border-gray-100 bg-gray-50/50">
-                                <h3 class="text-lg font-serif font-bold text-gray-800">Struk Pengiriman</h3>
-                            </div>
-                            <div class="p-6">
-                                <a href="{{ route('admin.orders.shipping-receipt', $order) }}" target="_blank" class="inline-flex items-center justify-center w-full px-4 py-3 rounded-xl bg-gray-900 text-white font-bold shadow hover:bg-gray-800 transition">
-                                    Unduh PDF Struk 5.8 cm
-                                </a>
-                                <p class="text-xs text-gray-500 mt-3">Ukuran cetak diset 5.8 cm.</p>
-                            </div>
-                        </div>
-                    @endif
                     
                     <!-- Customer Info -->
                     <div class="bg-white overflow-hidden shadow-xl sm:rounded-3xl border border-gray-100">
